@@ -1,12 +1,11 @@
 import { logger } from "./logger.js";
 
-// AICredits.in API configuration
-const AI_BASE_URL = "https://api.aicredits.in/v1";
-const VISION_MODEL = "google/gemini-2.0-flash";
-const apiKey = process.env.AICREDITS_API_KEY;
+const AI_BASE_URL = "https://router.bynara.id/v1";
+const VISION_MODEL = "mimo-v2.5-free";
+const apiKey = process.env.BYNARA_API_KEY;
 
 if (!apiKey) {
-  throw new Error("No API key found. Set AICREDITS_API_KEY in environment variables.");
+  throw new Error("No API key found. Set BYNARA_API_KEY in environment variables.");
 }
 
 export class APIError extends Error {
@@ -169,8 +168,8 @@ export async function extractTextFromBase64Image(
 
   if (!res.ok) {
     const errText = await res.text().catch(() => "");
-    logger.error({ status: res.status, body: errText }, "AICredits API error");
-    throw new APIError(`AICredits API error: ${res.status} — ${errText}`, res.status);
+    logger.error({ status: res.status, body: errText }, "Bynara API error");
+    throw new APIError(`Bynara API error: ${res.status} — ${errText}`, res.status);
   }
 
   const data = (await res.json()) as {
