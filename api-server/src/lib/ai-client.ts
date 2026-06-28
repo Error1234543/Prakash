@@ -2,8 +2,7 @@ import { logger } from "./logger.js";
 
 // AICredits.in API configuration
 const AI_BASE_URL = "https://api.aicredits.in/v1";
-const VISION_MODEL = "openai/gpt-4o-mini"; // supports vision
-
+const VISION_MODEL = "google/gemini-2.0-flash";
 const apiKey = process.env.AICREDITS_API_KEY;
 
 if (!apiKey) {
