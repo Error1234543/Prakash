@@ -1,0 +1,9 @@
+{
+  "name": "gujarati-ocr-bot",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "cd api-server && npm install && npm run build",
+    "start": "cd api-server && npm start"
+  }
+}
