@@ -1,7 +1,7 @@
 import { logger } from "./logger.js";
 
 const AI_BASE_URL = "https://router.bynara.id/v1";
-const VISION_MODEL = "mimo-v2.5-free";
+const VISION_MODEL = "claude-sonnet-4.6";
 const apiKey = process.env.BYNARA_API_KEY;
 
 if (!apiKey) {
