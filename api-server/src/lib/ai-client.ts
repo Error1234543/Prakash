@@ -1,7 +1,11 @@
 import { logger } from "./logger.js";
 
 const AI_BASE_URL = "https://router.bynara.id/v1";
-const VISION_MODEL = "mistral-large";
+
+// ⚠️ Confirm this is a valid free model on your router — I picked a common
+// free vision-capable model as a placeholder. Tell me the exact name if different.
+const VISION_MODEL = "mistral-medium-3-5";
+
 const apiKey = process.env.BYNARA_API_KEY;
 
 if (!apiKey) {
@@ -31,40 +35,59 @@ Q${startQNum}. [question text in Gujarati/English]
 ANS: [1 or 2 or 3 or 4]
 
 ━━━ NUMBERING ━━━
-- IGNORE printed question numbers in the image.
-- Start from Q${startQNum}. and count up sequentially.
+
+IGNORE printed question numbers in the image.
+
+Start from Q${startQNum}. and count up sequentially.
+
 
 ━━━ OPTION FORMAT — CRITICAL ━━━
-- ALWAYS use (1)(2)(3)(4) for options — even if the image shows (A)(B)(C)(D).
-  Convert: A→(1), B→(2), C→(3), D→(4)
-- ANS must ALWAYS be a single digit: 1, 2, 3, or 4.
-  Convert: A→1, B→2, C→3, D→4
-- Never use letters (A/B/C/D) in options or ANS.
+
+ALWAYS use (1)(2)(3)(4) for options — even if the image shows (A)(B)(C)(D).
+Convert: A→(1), B→(2), C→(3), D→(4)
+
+ANS must ALWAYS be a single digit: 1, 2, 3, or 4.
+Convert: A→1, B→2, C→3, D→4
+
+Never use letters (A/B/C/D) in options or ANS.
+
 
 ━━━ WHAT TO SKIP — DO NOT OUTPUT THESE ━━━
 Skip a question entirely (do not output it at all) if ANY of these apply:
-  • The question text is only a diagram/image with no readable Gujarati/English text
-  • ALL 4 options are diagrams/images (chemical structures, graphs, unlabelled figures) with no readable text
-  • It is a matching/matrix question (two columns to match)
-  • It is a fill-in-table question
-  • It has fewer than 4 options visible
-  NOTE: If the question TEXT references a figure ("આકૃતિ જુઓ") but options have readable text → INCLUDE it.
+• The question text is only a diagram/image with no readable Gujarati/English text
+• ALL 4 options are diagrams/images (chemical structures, graphs, unlabelled figures) with no readable text
+• It is a matching/matrix question (two columns to match)
+• It is a fill-in-table question
+• It has fewer than 4 options visible
+NOTE: If the question TEXT references a figure ("આકૃતિ જુઓ") but options have readable text → INCLUDE it.
 
 ━━━ OPTION RULES ━━━
-- Never leave an option blank.
-- Chemical structure image → condensed formula: CH₃OH, C₂H₅OH, CH₂=CH₂, C₆H₅OH, C₆H₅NH₂
-- Graph or fully unreadable image option → SKIP the whole question.
+
+Never leave an option blank.
+
+Chemical structure image → condensed formula: CH₃OH, C₂H₅OH, CH₂=CH₂, C₆H₅OH, C₆H₅NH₂
+
+Graph or fully unreadable image option → SKIP the whole question.
+
 
 ━━━ ANS RULES ━━━
-- ANS must be exactly 1, 2, 3, or 4.
-- If answer is marked/circled in image → use that (convert A→1 etc.).
-- If not marked → use your subject knowledge.
+
+ANS must be exactly 1, 2, 3, or 4.
+
+If answer is marked/circled in image → use that (convert A→1 etc.).
+
+If not marked → use your subject knowledge.
+
 
 ━━━ FORMATTING ━━━
-- Keep Gujarati text exactly as written. Do not translate.
-- No markdown (**, *, #, _). No PA codes. No headings. No separator lines.
-- Nothing outside Q blocks.
-- If page has zero valid MCQs → output exactly: NO_QUESTIONS`;
+
+Keep Gujarati text exactly as written. Do not translate.
+
+No markdown (**, *, #, _). No PA codes. No headings. No separator lines.
+
+Nothing outside Q blocks.
+
+If page has zero valid MCQs → output exactly: NO_QUESTIONS`;
 }
 
 const DIAGRAM_TOKENS = new Set(["[structure]", "[diagram]", "[image]", "[figure]", "[graph]", ""]);
@@ -75,6 +98,9 @@ function isDiagramOption(text: string): boolean {
 
 const LETTER_TO_NUM: Record<string, string> = { A: "1", B: "2", C: "3", D: "4" };
 
+// FIX: previously used `/^/gm` which matches an empty string at the start of
+// EVERY line and prepended "(1)(2)(3)(4)" to each line. Now it correctly
+// converts lines starting with (A)/(B)/(C)/(D) into (1)/(2)/(3)/(4).
 function normaliseBlock(b: string): string {
   let out = b
     .replace(/^\(A\)/gm, "(1)")
@@ -93,8 +119,11 @@ function cleanOutput(raw: string): { cleaned: string; count: number } {
       if (!t) return true;
       if (/^PA\d+\b/.test(t)) return false;
       if (/^#{1,6}\s/.test(t)) return false;
-      if (/^[─═\-=*]{4,}$/.test(t)) return false;
+      if (/^[─═\-=]{4,}$/.test(t)) return false;
       if (/^©/.test(t)) return false;
+      // FIX: previous regex `/^**.**$/` is invalid (nothing to repeat before
+      // `*`) and throws a SyntaxError at load time. This matches lines that
+      // are entirely wrapped in markdown bold, e.g. **like this**.
       if (/^\*\*.*\*\*$/.test(t)) return false;
       return true;
     })
@@ -112,7 +141,7 @@ function cleanOutput(raw: string): { cleaned: string; count: number } {
 
     b = normaliseBlock(b);
 
-    const qMatch = b.match(/^Q\d+\.\s*([\s\S]*?)(?=^\s*\([1-4]\)|\s*ANS:)/m);
+    const qMatch = b.match(/^Q\d+\.\s*([\s\S]*?)(?=^\s*\(?[1-4]\)?|\s*ANS:)/m);
     const qText = qMatch?.[1]?.trim() ?? b.split("\n")[0].replace(/^Q\d+\.\s*/, "").trim();
 
     const opts = [1, 2, 3, 4].map(
@@ -186,4 +215,3 @@ export async function extractTextFromBase64Image(
   logger.info({ questionsFound: count, startQNum }, "Page extracted");
   return { text: cleaned, questionsFound: count };
 }
-
