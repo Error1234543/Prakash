@@ -4,7 +4,7 @@ const AI_BASE_URL = "https://router.bynara.id/v1";
 
 // ⚠️ Confirm this is a valid free model on your router — I picked a common
 // free vision-capable model as a placeholder. Tell me the exact name if different.
-const VISION_MODEL = "mistral-medium-3-5";
+const VISION_MODEL = "agnes-2.5-flash";
 
 const apiKey = process.env.BYNARA_API_KEY;
 
