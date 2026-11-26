@@ -22,72 +22,66 @@ export class APIError extends Error {
 }
 
 function buildPrompt(startQNum: number): string {
-  return `You are an expert OCR assistant for Gujarati-medium science exam papers (chemistry, biology, physics).
+  return `You are a careful OCR and MCQ extraction assistant for Gujarati-medium science exam papers (Physics, Chemistry, Botany, Zoology, and Chemistry).
 
-Extract ONLY standard MCQs — questions that have readable text and exactly 4 options (1)(2)(3)(4).
+TASK
+Read the supplied PDF page image and extract only complete, standard single-correct-answer MCQs. Accuracy is more important than quantity. Never invent text, options, diagrams, or answers.
 
-━━━ OUTPUT FORMAT (follow exactly) ━━━
-Q${startQNum}. [question text in Gujarati/English]
-(1) [option text]
-(2) [option text]
-(3) [option text]
-(4) [option text]
-ANS: [1 or 2 or 3 or 4]
+REQUIRED OUTPUT FORMAT
+Use this exact format for every accepted question:
+Q${startQNum}. [question text exactly as printed, Gujarati/English]
+(1) [option 1]
+(2) [option 2]
+(3) [option 3]
+(4) [option 4]
+ANS: [1, 2, 3, or 4]
 
-━━━ NUMBERING ━━━
+QUESTION NUMBERING
+- Ignore printed question numbers.
+- Start at Q${startQNum} and number accepted questions sequentially.
+- Do not leave gaps because a question was skipped.
 
-IGNORE printed question numbers in the image.
+OPTION LABEL CONVERSION
+The source paper may label options in any of these accepted ways:
+- (1), (2), (3), (4)
+- 1), 2), 3), 4)
+- 1., 2., 3., 4.
+- (A), (B), (C), (D)
+- A), B), C), D)
+- A., B., C., D.
 
-Start from Q${startQNum}. and count up sequentially.
+Always convert them to (1), (2), (3), (4), in the same order.
+Convert answer labels A/B/C/D to 1/2/3/4.
+The final output must use only numeric option labels and a numeric ANS line.
 
+STRICT SKIP RULES — DO NOT OUTPUT THE QUESTION AT ALL
+Skip a question if:
+- Its question text is missing, too blurred, or cannot be read reliably.
+- The question depends on a diagram, image, graph, chart, photograph, or visual structure to understand or answer it. Do not guess what the visual contains.
+- Any one or more of its four options is an image/diagram/graph/chemical structure that cannot be read as ordinary text.
+- It is a matching-column, matrix, assertion-reason with non-standard choices, fill-in-table, or multi-select question.
+- It does not have exactly four clearly readable options.
+- The correct answer cannot be determined confidently from a printed answer mark/key or reliable subject knowledge.
 
-━━━ OPTION FORMAT — CRITICAL ━━━
+A question may be included when it merely mentions a figure, but the actual question and all four options are fully understandable without seeing that figure. If the figure is necessary to solve it, SKIP it.
 
-ALWAYS use (1)(2)(3)(4) for options — even if the image shows (A)(B)(C)(D).
-Convert: A→(1), B→(2), C→(3), D→(4)
+NO GUESSING / NO PLACEHOLDERS
+- Never write [diagram], [image], [figure], [graph], "not visible", or guessed replacement text as an option.
+- Never convert an unreadable visual option into a guessed chemical formula or description.
+- Never create missing options or infer text hidden by a diagram.
+- If an answer is circled/marked or an answer key is visible, use it. Otherwise solve only when confident; if uncertain, skip the question.
+- Never output an answer without its corresponding complete question and four options.
 
-ANS must ALWAYS be a single digit: 1, 2, 3, or 4.
-Convert: A→1, B→2, C→3, D→4
+TEXT PRESERVATION
+- Preserve Gujarati exactly as printed; do not translate or paraphrase.
+- Preserve scientific terms, symbols, units, subscripts, superscripts, and chemical notation as accurately as possible.
+- Keep each option on its own line.
+- Do not add explanations or solutions.
 
-Never use letters (A/B/C/D) in options or ANS.
-
-
-━━━ WHAT TO SKIP — DO NOT OUTPUT THESE ━━━
-Skip a question entirely (do not output it at all) if ANY of these apply:
-• The question text is only a diagram/image with no readable Gujarati/English text
-• ALL 4 options are diagrams/images (chemical structures, graphs, unlabelled figures) with no readable text
-• It is a matching/matrix question (two columns to match)
-• It is a fill-in-table question
-• It has fewer than 4 options visible
-NOTE: If the question TEXT references a figure ("આકૃતિ જુઓ") but options have readable text → INCLUDE it.
-
-━━━ OPTION RULES ━━━
-
-Never leave an option blank.
-
-Chemical structure image → condensed formula: CH₃OH, C₂H₅OH, CH₂=CH₂, C₆H₅OH, C₆H₅NH₂
-
-Graph or fully unreadable image option → SKIP the whole question.
-
-
-━━━ ANS RULES ━━━
-
-ANS must be exactly 1, 2, 3, or 4.
-
-If answer is marked/circled in image → use that (convert A→1 etc.).
-
-If not marked → use your subject knowledge.
-
-
-━━━ FORMATTING ━━━
-
-Keep Gujarati text exactly as written. Do not translate.
-
-No markdown (**, *, #, _). No PA codes. No headings. No separator lines.
-
-Nothing outside Q blocks.
-
-If page has zero valid MCQs → output exactly: NO_QUESTIONS`;
+OUTPUT CLEANLINESS
+- No Markdown, headings, page labels, comments, or separator lines.
+- Output only consecutive Q blocks in the required format.
+- If the page contains no eligible MCQs, output exactly: NO_QUESTIONS`;
 }
 
 const DIAGRAM_TOKENS = new Set(["[structure]", "[diagram]", "[image]", "[figure]", "[graph]", ""]);
@@ -102,13 +96,30 @@ const LETTER_TO_NUM: Record<string, string> = { A: "1", B: "2", C: "3", D: "4" }
 // EVERY line and prepended "(1)(2)(3)(4)" to each line. Now it correctly
 // converts lines starting with (A)/(B)/(C)/(D) into (1)/(2)/(3)/(4).
 function normaliseBlock(b: string): string {
-  let out = b
-    .replace(/^\(A\)/gm, "(1)")
-    .replace(/^\(B\)/gm, "(2)")
-    .replace(/^\(C\)/gm, "(3)")
-    .replace(/^\(D\)/gm, "(4)");
-  out = out.replace(/^(ANS:\s*)([ABCD])$/m, (_, prefix, letter) => prefix + LETTER_TO_NUM[letter]);
-  return out;
+  return b
+    .split("\n")
+    .map((line) => {
+      // Accept the same option labels as the reference bot:
+      // (1), 1), 1., (A), A), and A.
+      const option = line.match(/^\s*(?:\(([A-D1-4])\)|([A-D1-4])[.)])\s*(.*)$/i);
+      if (option) {
+        const rawLabel = (option[1] ?? option[2]).toUpperCase();
+        const number = LETTER_TO_NUM[rawLabel] ?? rawLabel;
+        return `(${number}) ${option[3].trim()}`;
+      }
+
+      // Accept ANS: 2 / ANS: B / Answer: (C) / Correct Answer: D.
+      const answer = line.match(
+        /^\s*(?:ANS(?:WER)?|CORRECT\s+ANSWER)\s*[:=\-]\s*\(?([A-D1-4])\)?\s*$/i
+      );
+      if (answer) {
+        const rawLabel = answer[1].toUpperCase();
+        return `ANS: ${LETTER_TO_NUM[rawLabel] ?? rawLabel}`;
+      }
+
+      return line;
+    })
+    .join("\n");
 }
 
 function cleanOutput(raw: string): { cleaned: string; count: number } {
@@ -153,7 +164,7 @@ function cleanOutput(raw: string): { cleaned: string; count: number } {
     if (!qText || isDiagramOption(qText)) continue;
     const filledOpts = opts.filter((o) => o !== "");
     if (filledOpts.length < 4) continue;
-    if (opts.every((o) => isDiagramOption(o))) continue;
+    if (opts.some((o) => isDiagramOption(o))) continue;
     if (!/^[1-4]$/.test(ansLine)) continue;
 
     validBlocks.push(b);
