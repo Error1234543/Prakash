@@ -22,7 +22,7 @@ export class APIError extends Error {
 }
 
 function buildPrompt(startQNum: number): string {
-  return `You are a careful OCR and MCQ extraction assistant for Gujarati-medium science exam papers (Physics, Chemistry, Botany, Zoology, and Chemistry).
+  return `You are a careful OCR and MCQ extraction assistant for Gujarati-medium science exam papers (Physics, Chemistry, Botany, and Zoology).
 
 TASK
 Read the supplied PDF page image and extract only complete, standard single-correct-answer MCQs. Accuracy is more important than quantity. Never invent text, options, diagrams, or answers.
@@ -87,7 +87,11 @@ OUTPUT CLEANLINESS
 const DIAGRAM_TOKENS = new Set(["[structure]", "[diagram]", "[image]", "[figure]", "[graph]", ""]);
 
 function isDiagramOption(text: string): boolean {
-  return DIAGRAM_TOKENS.has(text.toLowerCase().trim());
+  const value = text.toLowerCase().trim();
+  return (
+    DIAGRAM_TOKENS.has(value) ||
+    /^\\[?(?:diagram|image|figure|graph|structure)(?:\\s+(?:not visible|unreadable|omitted|option))?\\]?$/i.test(value)
+  );
 }
 
 const LETTER_TO_NUM: Record<string, string> = { A: "1", B: "2", C: "3", D: "4" };
