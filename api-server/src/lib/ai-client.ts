@@ -90,7 +90,7 @@ function isDiagramOption(text: string): boolean {
   const value = text.toLowerCase().trim();
   return (
     DIAGRAM_TOKENS.has(value) ||
-    /^\\[?(?:diagram|image|figure|graph|structure)(?:\\s+(?:not visible|unreadable|omitted|option))?\\]?$/i.test(value)
+    /^\[?(?:diagram|image|figure|graph|structure)(?:\s+(?:not visible|unreadable|omitted|option))?\]?$/i.test(value)
   );
 }
 
