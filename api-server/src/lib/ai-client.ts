@@ -72,8 +72,15 @@ NO GUESSING / NO PLACEHOLDERS
 - If an answer is circled/marked or an answer key is visible, use it. Otherwise solve only when confident; if uncertain, skip the question.
 - Never output an answer without its corresponding complete question and four options.
 
+GUJARATI LANGUAGE — THREE-PASS AUDIT (MANDATORY)
+Before producing the final output, perform these three internal review passes on every question:
+PASS 1 — OCR CHECK: Re-read the question and all four options against the page image. Correct Gujarati letters/matra/ જોડાક્ષર OCR mistakes only when the image clearly supports the correction.
+PASS 2 — LANGUAGE CHECK: Review every Gujarati word again for spelling, matras, joined letters, and accidental character substitutions. Gujarati words must remain in proper Gujarati script. Do not leave accidental Hindi/Devanagari characters inside Gujarati sentences. Keep genuine English scientific terms, formulas, and standard abbreviations in English.
+PASS 3 — FINAL PROOFREAD: Compare the complete question and each option with the image one last time. Check that no word was omitted, duplicated, mistranslated, or invented, and that option order and answer label are correct.
+If a Gujarati word cannot be read confidently after these checks, skip that entire MCQ rather than guessing.
+
 TEXT PRESERVATION
-- Preserve Gujarati exactly as printed; do not translate or paraphrase.
+- Preserve the original meaning and wording; do not translate or paraphrase.
 - Preserve scientific terms, symbols, units, subscripts, superscripts, and chemical notation as accurately as possible.
 - Keep each option on its own line.
 - Do not add explanations or solutions.
@@ -171,7 +178,16 @@ function cleanOutput(raw: string): { cleaned: string; count: number } {
     if (opts.some((o) => isDiagramOption(o))) continue;
     if (!/^[1-4]$/.test(ansLine)) continue;
 
-    validBlocks.push(b);
+    // Rebuild each accepted block from validated MCQ fields only.
+    // This prevents stray page-status text or other raw text from reaching the TXT file.
+    const questionNumber = b.match(/^Q(\d+)\./)?.[1];
+    if (!questionNumber) continue;
+    const canonicalBlock = [
+      `Q${questionNumber}. ${qText}`,
+      ...opts.map((option, index) => `(${index + 1}) ${option}`),
+      `ANS: ${ansLine}`,
+    ].join("\n");
+    validBlocks.push(canonicalBlock);
   }
 
   const cleaned = validBlocks.join("\n\n").trim();
