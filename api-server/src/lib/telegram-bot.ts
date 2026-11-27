@@ -100,9 +100,9 @@ export function startTelegramBot(): TelegramBot {
             break;
           }
 
-          // Non-rate-limit error on a single page — skip and continue
-          logger.error(err, `Failed to process page ${i + 1}`);
-          parts.push(`[Page ${i + 1} process nahi ho saki — skip]`);
+          // Non-rate-limit error on a single page — log it and continue.
+          // Never add diagnostic/status text to the MCQ output or TXT attachment.
+          logger.error(err, `Failed to process page ${i + 1}; skipped without adding raw text`);
         }
       }
 
